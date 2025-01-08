@@ -22,6 +22,28 @@ class WavGen:
             
         return samples
 
+    @staticmethod
+    def generate_rect_samples(frequency=100, sample_rate=16000, duration=5, amplitude=1.0):
+        num_samples = int(duration * sample_rate)
+        max_amplitude = 32767.0
+        scaled_amplitude = int(max_amplitude * amplitude)
+        
+        # Create pre-allocated array of 16-bit signed integers ('h' type code)
+        samples = array('h', [0] * num_samples)
+        
+        # Pre-calculate period in samples
+        samples_per_period = sample_rate / frequency
+        half_period = samples_per_period / 2
+        
+        for i in range(num_samples):
+            # Generate rectangular wave by checking position in period
+            if (i % samples_per_period) < half_period:
+                samples[i] = scaled_amplitude
+            else:
+                samples[i] = -scaled_amplitude
+            
+        return samples
+
 
 
 class AdpcmWavEncoder:
@@ -236,3 +258,7 @@ WavWriter.write_adpcm('output_150_adpcm.wav', sin150, sample_rate)
 sin500 = WavGen.generate_sine_samples(500, sample_rate, 5)
 WavWriter.write_pcm('output_500_pcm.wav', sin500, sample_rate)
 WavWriter.write_adpcm('output_500_adpcm.wav', sin500, sample_rate)
+
+rect200 = WavGen.generate_rect_samples(200, sample_rate, 5)
+WavWriter.write_pcm('output_rect200_pcm.wav', rect200, sample_rate)
+WavWriter.write_adpcm('output_rect200_adpcm.wav', rect200, sample_rate)

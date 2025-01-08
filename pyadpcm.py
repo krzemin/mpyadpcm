@@ -1,13 +1,16 @@
 from math import sin, pi
+from array import array
 import struct
 
 class WavGen:
     @staticmethod
     def generate_sine_samples(frequency=100, sample_rate=16000, duration=5):
-        samples = []
         num_samples = int(duration * sample_rate)
         two_pi = 2 * pi
         max_amplitude = 32767.0
+        
+        # Create pre-allocated array of 16-bit signed integers ('h' type code)
+        samples = array('h', [0] * num_samples)
         
         # Pre-calculate coefficient to reduce computations in loop
         freq_coefficient = two_pi * frequency / sample_rate
@@ -15,8 +18,7 @@ class WavGen:
         for i in range(num_samples):
             # Generate 16-bit sine wave sample (-32768 to 32767)
             # Using optimized calculation to reduce floating point operations
-            sample = int(max_amplitude * sin(i * freq_coefficient))
-            samples.append(sample)
+            samples[i] = int(max_amplitude * sin(i * freq_coefficient))
             
         return samples
 
@@ -89,36 +91,29 @@ class AdpcmWavEncoder:
             block_align: Block size in bytes (default 1024)
         """
         
-        # Pad with zeros if less than 2041 samples
-        if len(samples) < 2041:
-            samples.extend([0] * (2041 - len(samples)))
-
         self.prev_sample = samples[0]
 
-        # Write block header
-        f.write(struct.pack('<h', self.prev_sample))  # Initial predictor
-        f.write(struct.pack('<B', self.step_index))   # Initial index
-        f.write(struct.pack('<B', 0))                 # Reserved byte
+        # Create temporary byte array for the block
+        block_bytes = bytearray(block_align)
+        struct.pack_into('<h', block_bytes, 0, self.prev_sample)
+        block_bytes[2] = self.step_index
+        block_bytes[3] = 0
         
-        self.prev_sample = samples[0]
+        byte = 0
+        byte_pos = 4
+        i = 0
 
-        current_byte = 0
-        byte_count = 0
+        while byte_pos < 1024:
+            i += 1
+            nibble1 = self.encode_sample(samples[i] if i < len(samples) else 0)
+            i += 1
+            nibble2 = self.encode_sample(samples[i] if i < len(samples) else 0)
+            byte = nibble1 | (nibble2 << 4)
+            block_bytes[byte_pos] = byte
+            byte_pos += 1
         
-        for sample in samples[1:]:
-            encoded = self.encode_sample(sample)
-            if byte_count % 2 == 0:
-                current_byte = encoded
-            else:
-                current_byte |= (encoded << 4)
-                f.write(struct.pack('B', current_byte))
-            byte_count += 1
-        
-        if byte_count % 2 != 0:
-            f.write(struct.pack('B', current_byte))
-
-
-
+        # Write the complete block
+        f.write(block_bytes)
 
 class WavWriter:
     @staticmethod
@@ -190,11 +185,7 @@ class WavWriter:
             size_pos = WavWriter._write_riff_header(f)
             WavWriter._write_fmt_pcm(f, sample_rate)
             data_size_pos, data_start = WavWriter._write_data_header(f)
-            
-            # Write sample data
-            for sample in samples:
-                f.write(struct.pack('<h', sample))
-                
+            f.write(samples)
             WavWriter._update_sizes(f, size_pos, data_size_pos, data_start)
     
     @staticmethod        
@@ -238,9 +229,9 @@ class WavWriter:
 
 sample_rate = 16000
 
-# sin150 = WavGen.generate_sine_samples(150, sample_rate, 5)
-# WavWriter.write_pcm('output_150_pcm.wav', sin150, sample_rate)
-# WavWriter.write_adpcm('output_150_adpcm.wav', sin150, sample_rate)
+sin150 = WavGen.generate_sine_samples(150, sample_rate, 5)
+WavWriter.write_pcm('output_150_pcm.wav', sin150, sample_rate)
+WavWriter.write_adpcm('output_150_adpcm.wav', sin150, sample_rate)
 
 sin500 = WavGen.generate_sine_samples(500, sample_rate, 5)
 WavWriter.write_pcm('output_500_pcm.wav', sin500, sample_rate)

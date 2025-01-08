@@ -45,14 +45,11 @@ class WavGen:
         return samples
 
 
-
-class AdpcmWavEncoder:
-    # Index table for step size updates
-    _index_table = [-1, -1, -1, -1, 2, 4, 6, 8,
+# Index table for step size updates
+_adpcm_index_table = [-1, -1, -1, -1, 2, 4, 6, 8,
                     -1, -1, -1, -1, 2, 4, 6, 8]
-
-    # Step size lookup table
-    _step_table = [
+# Step size lookup table
+_adpcm_step_table = [
         7,     8,     9,    10,    11,    12,    13,    14,    16,    17,
        19,    21,    23,    25,    28,    31,    34,    37,    41,    45,
        50,    55,    60,    66,    73,    80,    88,    97,   107,   118,
@@ -63,12 +60,14 @@ class AdpcmWavEncoder:
      5894,  6484,  7132,  7845,  8630,  9493, 10442, 11487, 12635, 13899,
     15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767
     ]
-
-    # Difference lookup table
-    _diff_lookup = [
+# Difference lookup table
+_adpcm_diff_lookup = [
      1,  3,  5,  7,  9,  11,  13,  15,
     -1, -3, -5, -7, -9, -11, -13, -15
     ]
+
+
+class AdpcmWavEncoder:
 
     def __init__(self):
         self.prev_sample = 0
@@ -80,14 +79,13 @@ class AdpcmWavEncoder:
         delta = sample - self.prev_sample
         
         # Calculate the nibble value
-        step = self._step_table[self.step_index]
+        step = _adpcm_step_table[self.step_index]
         nibble = min(7, abs(delta) * 4 // step)
         if delta < 0:
             nibble += 8
 
         # Update predictor and step index
-        diff = (step * self._diff_lookup[nibble]) // 8
-        self.prev_sample += diff
+        self.prev_sample += (step * _adpcm_diff_lookup[nibble]) // 8
         
         # Clamp predictor to 16-bit signed range
         if self.prev_sample > 32767:
@@ -96,7 +94,7 @@ class AdpcmWavEncoder:
             self.prev_sample = -32768
             
         # Update step index
-        self.step_index += self._index_table[nibble]
+        self.step_index += _adpcm_index_table[nibble]
         if self.step_index < 0:
             self.step_index = 0
         elif self.step_index > 88:

@@ -102,11 +102,10 @@ class AdpcmWavEncoder:
 
         return nibble
 
-    def encode_block(self, f, samples, block_align=1024):
+    def encode_block(self, samples, block_align=1024):
         """Encode a block of samples and write to file.
         
         Args:
-            f: Open file handle to write to
             samples: List of 16-bit PCM samples
             block_align: Block size in bytes (default 1024)
         """
@@ -119,21 +118,18 @@ class AdpcmWavEncoder:
         block_bytes[2] = self.step_index
         block_bytes[3] = 0
         
-        byte = 0
         byte_pos = 4
         i = 0
 
-        while byte_pos < 1024:
+        while byte_pos < block_align:
             i += 1
             nibble1 = self.encode_sample(samples[i] if i < len(samples) else 0)
             i += 1
             nibble2 = self.encode_sample(samples[i] if i < len(samples) else 0)
-            byte = nibble1 | (nibble2 << 4)
-            block_bytes[byte_pos] = byte
+            block_bytes[byte_pos] = nibble1 | (nibble2 << 4)
             byte_pos += 1
-        
-        # Write the complete block
-        f.write(block_bytes)
+       
+        return block_bytes
 
 class WavWriter:
     @staticmethod
@@ -238,12 +234,11 @@ class WavWriter:
             num_blocks = 0
             for i in range(0, len(samples), samples_per_block):
                 block_samples = samples[i:i + samples_per_block]
-                encoder.encode_block(f, block_samples, block_align)
+                block_bytes = encoder.encode_block(block_samples, block_align)
+                f.write(block_bytes)
                 num_blocks += 1
                 
             WavWriter._update_sizes(f, size_pos, data_size_pos, data_start)
-
-
 
 
 
